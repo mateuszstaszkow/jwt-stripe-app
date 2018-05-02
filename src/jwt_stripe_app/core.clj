@@ -6,7 +6,8 @@
   (:require [org.httpkit.client :as http]
 		[clj-jwt.core  :refer :all]
 		[clj-jwt.key   :refer [private-key]]
-		[clj-time.core :refer [now plus days]])
+		[clj-time.core :refer [now plus days]]
+		[aero.core :refer (read-config)])
   (:gen-class :main true))
 
 (defn -main []
@@ -14,21 +15,25 @@
    
 (def user_jwt "")
 (def claim nil)
-(def merchant_id 1)
-(def subscription_id 1234)
-(def allowed_plans [1 2 3])
+
+(defn read-secrets [] 
+  (read-config "resources/secrets.edn"))
   
-(defn show-landing-page [req])
+(defn build-claim [credentials]
+  {:merchant_id (:merchant_id credentials)
+   :subscription_id (:subscription_id credentials)
+   :allowed_plans (:allowed_plans credentials)
+   :exp (plus (now) (days 1))
+   :iat (now)})
+   
+(defn update-user-token []
+  (def secrets (read-secrets))
+  (def claim (build-claim secrets))
+  (let [token (-> claim jwt (sign :HS256 (:jwt_token secrets)) to-str)]
+	(def user_jwt token)))
 
 (defn login [req]
-  (def claim
-    {:merchant_id merchant_id
-	 :subscription_id subscription_id
-	 :allowed_plans allowed_plans
-     :exp (plus (now) (days 1))
-     :iat (now)})
-  (let [token (-> claim jwt (sign :HS256 "tajny-klucz") to-str)]
-	(def user_jwt token))
+  (update-user-token)
   {:status  200
    :headers {"Content-Type" "text/html"}
    :body    (str "JWT: " user_jwt)})
