@@ -3,5 +3,6 @@
   :dependencies [[org.clojure/clojure "1.8.0"]
 				[http-kit "2.2.0"]
 				[compojure "1.6.1"]
-				[javax.servlet/servlet-api "2.5"]]
+				[javax.servlet/servlet-api "2.5"]
+				[clj-jwt "0.1.1"]]
   :main jwt-stripe-app.core)
