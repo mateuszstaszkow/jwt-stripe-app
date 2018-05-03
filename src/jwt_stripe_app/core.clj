@@ -7,6 +7,7 @@
 		[clj-jwt.core  :refer :all]
 		[clj-jwt.key   :refer [private-key]]
 		[clj-time.core :refer [now plus days]]
+		[clojure.data.json :as json]
 		[aero.core :refer (read-config)])
   (:gen-class :main true))
 
@@ -15,6 +16,9 @@
    
 (def user_jwt "")
 (def claim nil)
+
+(def stripe_api_key "Bearer sk_test_BQokikJOvBiI2HlWgH4olfQ2")
+(def stripe_api_url "https://api.stripe.com/v1/plans/")
 
 (defn read-secrets [] 
   (read-config "resources/secrets.edn"))
@@ -38,27 +42,52 @@
    :headers {"Content-Type" "text/html"}
    :body    (str "JWT: " user_jwt)})
   
-(defn app [req]
+(defn return-response [body]
   {:status  200
-   :headers {"Content-Type" "text/html"}
-   :body    "hello HTTP!"})
-   
-(defn client-test [req]
-  (let [{:keys [status headers body error] :as resp} @(http/get "http://localhost:8888/")]
-	{:status  200
-	 :headers {"Content-Type" "text/html"}
-	 :body    (str "http client used, result: " body)}))
+   :headers {"Content-Type" "application/json"}
+   :body    body})
+  
+(defn get-plan-details [plan_id]
+  (def url (str stripe_api_url plan_id))
+  (def headers {:headers {"Authorization" stripe_api_key}})
+  (let [{:keys [status headers body error] :as resp} @(http/get url headers)]
+    body))
   
 (defn get-plan [req]
-  {:status  200
-   :headers {"Content-Type" "text/html"}
-   :body    (-> user_jwt str->jwt :claims)})
+  (def secrets (read-secrets))
+  (def plan_id (:subscription_id secrets))
+  (return-response (get-plan-details plan_id)))
+  
+(defn get-allowed-plans [req]
+  (def secrets (read-secrets))
+  (def plan_ids (:allowed_plans secrets))
+  (def plan_bodies (map get-plan-details plan_ids))
+  (def plans_reponse "[")
+  (doseq [x plan_bodies] (def plans_reponse (str plans_reponse x ",")))
+  (def plans_reponse (str plans_reponse "]"))
+  (return-response plans_reponse))
+  
+(defn update-plan-values [new_id, new_allowed_plans]
+  (def secrets (read-secrets))
+  (if new_id
+    (def secrets (assoc secrets :subscription_id new_id)))
+  (if new_allowed_plans
+    (def secrets (assoc secrets :allowed_plans new_allowed_plans)))
+  secrets)
+  
+(defn update-plan [body]
+  (def body_str (slurp body))
+  (def body_obj (json/read-str body_str :key-fn keyword))
+  (def new_id (:subscription_id body_obj))
+  (def new_allowed_plans (:allowed_plans body_obj))
+  (spit "resources/secrets.edn" (update-plan-values new_id new_allowed_plans))
+  (return-response ""))
   
 (defroutes all-routes
-  (GET "/" [] app)
-  (GET "/test" [] client-test)
   (GET "/login" [] login)
-  (GET "/plan" [] get-plan)
+  (GET "/plan"  [] get-plan)
+  (POST "/plan" {body :body} (update-plan body))
+  (GET "/plans" [] get-allowed-plans)
   (not-found "<p>Page not found.</p>"))
    
 (run-server (site #'all-routes) {:port 8888})
