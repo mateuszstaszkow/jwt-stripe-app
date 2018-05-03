@@ -30,17 +30,36 @@
    :exp (plus (now) (days 1))
    :iat (now)})
    
+(defn verify-token [token]
+   (-> token str->jwt (verify "tajny-klucz")))
+   
+(defn get-credentials-from-token [token]
+   (-> token str->jwt :claims))
+   
 (defn update-user-token []
   (def secrets (read-secrets))
   (def claim (build-claim secrets))
   (let [token (-> claim jwt (sign :HS256 (:jwt_token secrets)) to-str)]
 	(def user_jwt token)))
-
-(defn login [req]
+	
+(defn update-and-set-token []
   (update-user-token)
   {:status  200
-   :headers {"Content-Type" "text/html"}
-   :body    (str "JWT: " user_jwt)})
+   :headers {"Set-Cookie" user_jwt}})
+
+(defn login [body]
+  (def body_str (slurp body))
+  (def body_obj (json/read-str body_str :key-fn keyword))
+  (def secrets (read-secrets))
+  (def equal_login (= (:login body_obj) (str (:merchant_id secrets))))
+  (def equal_password (= (:password body_obj) (str (:password secrets))))
+  (if (and equal_login equal_password)
+    (update-and-set-token)
+	{:status 401}))
+   
+(defn logout [req]
+  {:status  200
+   :headers {"Set-Cookie" ""}})
   
 (defn return-response [body]
   {:status  200
@@ -53,14 +72,14 @@
   (let [{:keys [status headers body error] :as resp} @(http/get url headers)]
     body))
   
-(defn get-plan [req]
-  (def secrets (read-secrets))
-  (def plan_id (:subscription_id secrets))
+(defn get-plan [headers]
+  (def credentials (get-credentials-from-token (headers "cookie")))
+  (def plan_id (:subscription_id credentials))
   (return-response (get-plan-details plan_id)))
   
-(defn get-allowed-plans [req]
-  (def secrets (read-secrets))
-  (def plan_ids (:allowed_plans secrets))
+(defn get-allowed-plans [headers]
+  (def credentials (get-credentials-from-token (headers "cookie")))
+  (def plan_ids (:allowed_plans credentials))
   (def plan_bodies (map get-plan-details plan_ids))
   (def plans_reponse "[")
   (doseq [x plan_bodies] (def plans_reponse (str plans_reponse x ",")))
@@ -84,10 +103,11 @@
   (return-response ""))
   
 (defroutes all-routes
-  (GET "/login" [] login)
-  (GET "/plan"  [] get-plan)
+  (POST "/login" {body :body} (login body))
+  (POST "/logout" [] logout)
+  (GET "/plan"  {headers :headers} (get-plan headers))
   (POST "/plan" {body :body} (update-plan body))
-  (GET "/plans" [] get-allowed-plans)
+  (GET "/plans" {headers :headers} (get-allowed-plans headers))
   (not-found "<p>Page not found.</p>"))
    
 (run-server (site #'all-routes) {:port 8888})
