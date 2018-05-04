@@ -10,12 +10,13 @@
 			
 (fact "get merchant id from JWT of merchant1 after login"
   ; Given
-  (def token (last (first (:headers (login (build-login-body))))))
+  (def token ((:headers (login (build-login-body))) "Set-Cookie"))
   ; When => Then
   (:merchant_id (get-credentials-from-token token)) => "merchant1")
   
 (fact "clear JWT cookie after logout"
-  (last (first (:headers (logout nil)))) => "")
+  ; When => Then
+  ((:headers (logout nil)) "Set-Cookie") => "")
   
 (fact "get subscription plan for username user"
   )
