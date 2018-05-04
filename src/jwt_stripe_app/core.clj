@@ -11,14 +11,15 @@
 		[aero.core :refer (read-config)])
   (:gen-class :main true))
 
-(defn -main []
-  (println "JWT Stripe App started"))
-   
+(def stripe_api_key "Bearer sk_test_BQokikJOvBiI2HlWgH4olfQ2")
+(def stripe_api_url "https://api.stripe.com/v1/plans/")
+(def jwt_secret "tajny-klucz")
+
 (def user_jwt "")
 (def claim nil)
 
-(def stripe_api_key "Bearer sk_test_BQokikJOvBiI2HlWgH4olfQ2")
-(def stripe_api_url "https://api.stripe.com/v1/plans/")
+(defn -main []
+  (println "JWT Stripe App started"))
 
 (defn read-secrets [] 
   (read-config "resources/secrets.edn"))
@@ -30,11 +31,16 @@
    :exp (plus (now) (days 1))
    :iat (now)})
    
-(defn verify-token [token]
-   (-> token str->jwt (verify "tajny-klucz")))
+(defn authorize-request [headers]
+)
    
 (defn get-credentials-from-token [token]
    (-> token str->jwt :claims))
+   
+(defn verify-token [token]
+  (and (and (not= token nil) (not= token ""))
+    (= (str (:merchant_id (read-secrets)))
+	  (:merchant_id (get-credentials-from-token token)))))
    
 (defn update-user-token []
   (def secrets (read-secrets))
@@ -47,9 +53,11 @@
   {:status  200
    :headers {"Set-Cookie" user_jwt}})
 
+(defn convert-json-body-to-map [body]
+  (json/read-str (slurp body) :key-fn keyword))
+   
 (defn login [body]
-  (def body_str (slurp body))
-  (def body_obj (json/read-str body_str :key-fn keyword))
+  (def body_obj (convert-json-body-to-map body))
   (def secrets (read-secrets))
   (def equal_login (= (:login body_obj) (str (:merchant_id secrets))))
   (def equal_password (= (:password body_obj) (str (:password secrets))))
@@ -67,15 +75,20 @@
    :body    body})
   
 (defn get-plan-details [plan_id]
-  (def url (str stripe_api_url plan_id))
-  (def headers {:headers {"Authorization" stripe_api_key}})
-  (let [{:keys [status headers body error] :as resp} @(http/get url headers)]
+  (def stripe_url (str stripe_api_url plan_id))
+  (def auth_headers {:headers {"Authorization" stripe_api_key}})
+  (let [{:keys [status headers body error] :as resp} @(http/get stripe_url auth_headers)]
     body))
   
 (defn get-plan [headers]
   (def credentials (get-credentials-from-token (headers "cookie")))
   (def plan_id (:subscription_id credentials))
   (return-response (get-plan-details plan_id)))
+  
+(defn get-plan-auth [headers]
+  (if (verify-token (headers "cookie"))
+    (get-plan headers)
+	{:status 401}))
   
 (defn get-allowed-plans [headers]
   (def credentials (get-credentials-from-token (headers "cookie")))
@@ -85,6 +98,11 @@
   (doseq [x plan_bodies] (def plans_reponse (str plans_reponse x ",")))
   (def plans_reponse (str plans_reponse "]"))
   (return-response plans_reponse))
+  
+(defn get-allowed-plans-auth [headers]
+  (if (verify-token (headers "cookie"))
+    (get-allowed-plans headers)
+	{:status 401}))
   
 (defn update-plan-values [new_id, new_allowed_plans]
   (def secrets (read-secrets))
@@ -102,12 +120,17 @@
   (spit "resources/secrets.edn" (update-plan-values new_id new_allowed_plans))
   (return-response ""))
   
+(defn update-plan-auth [body headers]
+  (if (verify-token (headers "cookie"))
+    (update-plan body)
+	{:status 401}))
+  
 (defroutes all-routes
   (POST "/login" {body :body} (login body))
   (POST "/logout" [] logout)
-  (GET "/plan"  {headers :headers} (get-plan headers))
-  (POST "/plan" {body :body} (update-plan body))
-  (GET "/plans" {headers :headers} (get-allowed-plans headers))
+  (GET "/plan"  {headers :headers} (get-plan-auth headers))
+  (POST "/plan" {body :body headers :headers} (update-plan-auth body headers))
+  (GET "/plans" {headers :headers} (get-allowed-plans-auth headers))
   (not-found "<p>Page not found.</p>"))
    
 (run-server (site #'all-routes) {:port 8888})
