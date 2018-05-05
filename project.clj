@@ -8,5 +8,6 @@
 				[aero "1.1.3"]
 				[org.clojure/data.json "0.2.6"]
 				[midje "1.9.1"]
+				[bcrypt-clj "0.3.3"]
 				[clj-jwt "0.1.1"]]
   :main jwt-stripe-app.core)
