@@ -1,6 +1,8 @@
 (ns jwt-stripe-app.core-test
   (:use midje.sweet
-		jwt-stripe-app.core) 
+		jwt-stripe-app.core
+		jwt-stripe-app.security
+		jwt-stripe-app.stripe-rest) 
   (:require [jwt-stripe-app.core :as core]
 			[clojure.string :as str]))
 
