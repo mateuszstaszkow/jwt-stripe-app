@@ -2,7 +2,9 @@
   (:use [compojure.route :only [files not-found]]
         [compojure.handler :only [site]] ; form, query params decode; cookie; session, etc
         [compojure.core :only [defroutes GET POST DELETE ANY context]]
-        org.httpkit.server)
+		[clojure.string :only (join)]
+        org.httpkit.server
+		bcrypt-clj.auth)
   (:require [org.httpkit.client :as http]
 		[clj-jwt.core  :refer :all]
 		[clj-jwt.key   :refer [private-key]]
@@ -31,9 +33,6 @@
    :exp (plus (now) (days 1))
    :iat (now)})
    
-(defn authorize-request [headers]
-)
-   
 (defn get-credentials-from-token [token]
    (-> token str->jwt :claims))
    
@@ -45,7 +44,7 @@
 (defn update-user-token []
   (def secrets (read-secrets))
   (def claim (build-claim secrets))
-  (let [token (-> claim jwt (sign :HS256 (:jwt_token secrets)) to-str)]
+  (let [token (-> claim jwt (sign :HS256 jwt_secret) to-str)]
 	(def user_jwt token)))
 	
 (defn update-and-set-token []
@@ -53,14 +52,14 @@
   {:status  200
    :headers {"Set-Cookie" user_jwt}})
 
-(defn convert-json-body-to-map [body]
+(defn convert-json-body-to-dto [body]
   (json/read-str (slurp body) :key-fn keyword))
    
 (defn login [body]
-  (def body_obj (convert-json-body-to-map body))
+  (def dto (convert-json-body-to-dto body))
   (def secrets (read-secrets))
-  (def equal_login (= (:login body_obj) (str (:merchant_id secrets))))
-  (def equal_password (= (:password body_obj) (str (:password secrets))))
+  (def equal_login (= (:login dto) (str (:merchant_id secrets))))
+  (def equal_password (check-password (:password dto) (str (:password secrets))))
   (if (and equal_login equal_password)
     (update-and-set-token)
 	{:status 401}))
@@ -96,7 +95,7 @@
   (def plan_bodies (map get-plan-details plan_ids))
   (def plans_reponse "[")
   (doseq [x plan_bodies] (def plans_reponse (str plans_reponse x ",")))
-  (def plans_reponse (str plans_reponse "]"))
+  (def plans_reponse (str (join "" (drop-last plans_reponse)) "]"))
   (return-response plans_reponse))
   
 (defn get-allowed-plans-auth [headers]
@@ -113,10 +112,9 @@
   secrets)
   
 (defn update-plan [body]
-  (def body_str (slurp body))
-  (def body_obj (json/read-str body_str :key-fn keyword))
-  (def new_id (:subscription_id body_obj))
-  (def new_allowed_plans (:allowed_plans body_obj))
+  (def dto (convert-json-body-to-dto body))
+  (def new_id (:subscription_id dto))
+  (def new_allowed_plans (:allowed_plans dto))
   (spit "resources/secrets.edn" (update-plan-values new_id new_allowed_plans))
   (return-response ""))
   
