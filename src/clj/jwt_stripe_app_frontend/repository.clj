@@ -1,4 +1,4 @@
-(ns jwt-stripe-app.repository
+(ns jwt-stripe-app-frontend.repository
   (:require [aero.core :refer (read-config)]))
 
 (defn read-secrets [] 

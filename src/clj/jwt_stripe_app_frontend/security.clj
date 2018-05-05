@@ -1,18 +1,31 @@
-(ns jwt-stripe-app.security
-  (:use jwt-stripe-app.repository
-		bcrypt-clj.auth)
+(ns jwt-stripe-app-frontend.security
+  (:use jwt-stripe-app-frontend.repository
+		bcrypt-clj.auth
+		[clojure.string :only (join)])
   (:require [clj-jwt.core  :refer :all]
 			[clj-jwt.key   :refer [private-key]]
 			[clj-time.core :refer [now plus days]]
-			[clojure.data.json :as json]))
+			[clojure.data.json :as json]
+			[clojure.string :as str]))
 
 (def jwt_secret "tajny-klucz")
 
 (def user_jwt "")
 (def claim nil)
 
+(defn find-token [cookie]
+  (.contains cookie "jwt"))
+
+(defn get-jwt-from-cookie [cookie]
+  (let [cookie_array (str/split cookie #";")]
+	(let [found_token (filter find-token cookie_array)]
+	  (subs (first found_token) 5))))
+
 (defn get-credentials-from-token [token]
-   (-> token str->jwt :claims))
+  (-> token str->jwt :claims))
+   
+(defn get-credentials-from-cookie [cookie]
+  (get-credentials-from-token (get-jwt-from-cookie cookie)))
    
 (defn build-claim [credentials]
   {:merchant_id (:merchant_id credentials)
@@ -27,15 +40,16 @@
       (let [token (-> claim jwt (sign :HS256 jwt_secret) to-str)]
 	    (def user_jwt token)))))
 		
-(defn verify-token [token]
-  (and (and (not= token nil) (not= token ""))
-    (= (str (:merchant_id (read-secrets)))
-	  (:merchant_id (get-credentials-from-token token)))))
+(defn verify-token [cookie]
+  (let [token (get-jwt-from-cookie cookie)]
+    (and (and (not= token nil) (not= token ""))
+      (= (str (:merchant_id (read-secrets)))
+	    (:merchant_id (get-credentials-from-token token))))))
 	  
 (defn update-and-set-token []
   (update-user-token)
   {:status  200
-   :headers {"Set-Cookie" user_jwt}})
+   :headers {"Set-Cookie" (str "jwt=" user_jwt)}})
 
 (defn login [body]
   (let [dto (json/read-str (slurp body) :key-fn keyword)]
@@ -48,7 +62,7 @@
    
 (defn logout [req]
   {:status  200
-   :headers {"Set-Cookie" ""}})
+   :headers {"Set-Cookie" "jwt="}})
 			
 
 	
