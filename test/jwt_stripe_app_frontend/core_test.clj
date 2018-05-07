@@ -1,9 +1,9 @@
-(ns jwt-stripe-app.core-test
+(ns jwt-stripe-app-frontend.core-test
   (:use midje.sweet
-		jwt-stripe-app.core
-		jwt-stripe-app.security
-		jwt-stripe-app.stripe-rest) 
-  (:require [jwt-stripe-app.core :as core]
+		jwt-stripe-app-frontend.core
+		jwt-stripe-app-frontend.security
+		jwt-stripe-app-frontend.stripe-rest) 
+  (:require [jwt-stripe-app-frontend.core :as core]
 			[clojure.string :as str]))
 
 (defn build-login-body [] 
@@ -17,9 +17,9 @@
   ; Given
   (def login_body (build-login-body))
   ; When
-  (def token ((:headers (login login_body)) "Set-Cookie"))
+  (def cookie ((:headers (login login_body)) "Set-Cookie"))
   ; Then
-  (:merchant_id (get-credentials-from-token token)) => "merchant1")
+  (:merchant_id (get-credentials-from-cookie cookie)) => "merchant1")
   
 (fact "get not authorized status for plan endpoint"
   ; Given
@@ -49,7 +49,7 @@
   ; When
   (def token ((:headers (logout nil)) "Set-Cookie"))
   ; Then
-  token => "")
+  token => "jwt=")
   
 (fact "get subscription plan for user merchant1"
   ; Given

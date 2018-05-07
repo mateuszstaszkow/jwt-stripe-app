@@ -1,7 +1,7 @@
-(ns jwt-stripe-app.stripe-service
+(ns jwt-stripe-app-frontend.stripe-service
   (:use [clojure.string :only (join)]
-		jwt-stripe-app.repository
-		jwt-stripe-app.security)
+		jwt-stripe-app-frontend.repository
+		jwt-stripe-app-frontend.security)
   (:require [clj-jwt.core  :refer :all]
 			[clj-jwt.key   :refer [private-key]]
 			[clj-time.core :refer [now plus days]]
@@ -31,7 +31,7 @@
   updating_secrets)
 
 (defn get-allowed-plans [headers]
-  (let [credentials (get-credentials-from-token (headers "cookie"))]
+  (let [credentials (get-credentials-from-cookie (headers "cookie"))]
     (let [plan_ids (:allowed_plans credentials)]
       (let [plan_bodies (map get-plan-details plan_ids)]
         (def plans_reponse "[")
@@ -40,7 +40,7 @@
         (return-response plans_reponse)))))
   
 (defn get-plan [headers]
-  (let [credentials (get-credentials-from-token (headers "cookie"))]
+  (let [credentials (get-credentials-from-cookie (headers "cookie"))]
     (let [plan_id (:subscription_id credentials)]
       (return-response (get-plan-details plan_id)))))
   
