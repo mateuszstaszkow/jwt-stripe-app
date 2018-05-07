@@ -20,6 +20,8 @@
                  [compojure "1.6.1"]
                  [hiccup "1.0.5"]
                  [yogthos/config "1.1.1"]
+				 [cljs-ajax "0.7.3"]
+				 [alandipert/storage-atom "1.2.4"]
                  [org.clojure/clojurescript "1.10.238"
                   :scope "provided"]
                  [secretary "1.2.3"]
@@ -32,7 +34,7 @@
             [lein-asset-minifier "0.2.7"
              :exclusions [org.clojure/clojure]]]
 
-  :ring {:handler jwt-stripe-app-frontend.handler/app
+  :ring {:handler jwt-stripe-app-frontend.stripe-rest/app
          :uberwar-name "jwt-stripe-app-frontend.war"}
 
   :min-lein-version "2.5.0"
@@ -88,7 +90,7 @@
 
 
 
-  :profiles {:dev {:repl-options {:init-ns jwt-stripe-app-frontend.repl
+  :profiles {:dev {:repl-options {:init-ns jwt-stripe-app-frontend.core-test
                                   :nrepl-middleware [cemerick.piggieback/wrap-cljs-repl]}
 
                    :dependencies [[binaryage/devtools "0.9.9"]

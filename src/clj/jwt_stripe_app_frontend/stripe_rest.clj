@@ -52,8 +52,6 @@
   (GET "/plan"  {headers :headers} (get-plan-auth headers))
   (POST "/plan" {body :body headers :headers} (update-plan-auth body headers))
   (GET "/plans" {headers :headers} (get-allowed-plans-auth headers))
-  (not-found {:status 404}))
+  (not-found "404 Not Found"))
   
 (def app (wrap-defaults #'all-routes (assoc-in site-defaults [:security :anti-forgery] false)))
-
-;(def app (wrap-defaults app-routes ))

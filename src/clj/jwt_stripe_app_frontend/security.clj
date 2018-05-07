@@ -1,7 +1,7 @@
 (ns jwt-stripe-app-frontend.security
   (:use jwt-stripe-app-frontend.repository
 		bcrypt-clj.auth
-		[clojure.string :only (join)])
+		[clojure.string :only (join index-of)])
   (:require [clj-jwt.core  :refer :all]
 			[clj-jwt.key   :refer [private-key]]
 			[clj-time.core :refer [now plus days]]
@@ -18,8 +18,10 @@
 
 (defn get-jwt-from-cookie [cookie]
   (let [cookie_array (str/split cookie #";")]
-	(let [found_token (filter find-token cookie_array)]
-	  (subs (first found_token) 5))))
+	(let [found_token (first (filter find-token cookie_array))]
+	  (if (some? found_token)
+	    (subs found_token (inc (index-of found_token "=")))
+		""))))
 
 (defn get-credentials-from-token [token]
   (-> token str->jwt :claims))
@@ -41,10 +43,9 @@
 	    (def user_jwt token)))))
 		
 (defn verify-token [cookie]
-  (let [token (get-jwt-from-cookie cookie)]
-    (and (and (not= token nil) (not= token ""))
-      (= (str (:merchant_id (read-secrets)))
-	    (:merchant_id (get-credentials-from-token token))))))
+  (and (and (not= cookie nil) (not= cookie ""))
+    (= (str (:merchant_id (read-secrets)))
+	  (:merchant_id (get-credentials-from-cookie cookie)))))
 	  
 (defn update-and-set-token []
   (update-user-token)

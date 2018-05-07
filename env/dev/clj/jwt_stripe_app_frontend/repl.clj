@@ -1,5 +1,5 @@
 (ns jwt-stripe-app-frontend.repl
-  (:use jwt-stripe-app-frontend.handler
+  (:use jwt-stripe-app-frontend.stripe-rest
         figwheel-sidecar.repl-api
         ring.server.standalone
         [ring.middleware file-info file]))
